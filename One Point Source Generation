@@ -18,7 +18,7 @@ excluded_array = '-1'
 excluded_baseline = '' 
 tolerence = '0.0000000001'
 	
-for index in range(5):
+for index in range(30):
 
 	Locations=np.zeros((ny,nx,3))
 	interval=5
