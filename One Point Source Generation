@@ -58,7 +58,8 @@ for index in range(30):
 	#Transport_ratio = (Transport_ratio_perfect * (np.random.rand(ny,nx)+0.5) * np.exp((np.random.rand(ny,nx)-0.5)*1.0j).astype('complex64')
 	#Transport_ratio = Transport_ratio_perfect
 	#Transport_ratio[0][0]=( (1+0.2*(np.random.rand()-0.5)) * np.exp((0.2*(np.random.rand()-0.5))*1.0j)).astype('complex64')
-	Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.1,size=(ny,nx)) * np.exp((np.random.normal(scale=0.1,size=(ny,nx))*1.0j))).astype('complex64')
+	#Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.1,size=(ny,nx)) * np.exp((np.random.normal(scale=0.1,size=(ny,nx))*1.0j))).astype('complex64')
+	Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.3,size=(ny,nx)) * np.exp(((np.random.rand(ny,nx)-0.5)*0.02*1.0j))).astype('complex64')
 	
 	Transport_ratio_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_Transport_ratio_%i.txt'%index
 	Transport_ratio_document_raw = Transport_ratio.reshape((nant,1))
