@@ -7,6 +7,8 @@ import scipy.linalg as la
 import commands, os, time, math, ephem
 import omnical.calibration_omni as omni
 
+
+
 #K=np.zeros(1,3)
 K=np.array([-1.0,-1.0,-1.0])
 Intensity=1.0
@@ -14,9 +16,14 @@ nx=81
 ny=81
 nant=nx*ny
 
+scale_amplitude_n = 0.05
+scale_phase_r = 0.0025
+
+
 excluded_array = ''
 excluded_baseline = '' 
 tolerence = '0.0000000001'
+
 	
 for index in range(10):
 
@@ -61,7 +68,7 @@ for index in range(10):
 	#Transport_ratio = Transport_ratio_perfect
 	#Transport_ratio[0][0]=( (1+0.2*(np.random.rand()-0.5)) * np.exp((0.2*(np.random.rand()-0.5))*1.0j)).astype('complex64')
 	#Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.3,size=(ny,nx)) * np.exp((np.random.normal(scale=0.05,size=(ny,nx))*1.0j))).astype('complex64')
-	Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.05,size=(ny,nx)) * np.exp(((np.random.rand(ny,nx)-0.5)*0.0025*1.0j))).astype('complex64')
+	Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=scale_amplitude_n,size=(ny,nx)) * np.exp(((np.random.rand(ny,nx)-0.5)*scale_phase_r*1.0j))).astype('complex64')
 	
 	Transport_ratio_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_Transport_ratio_%i.txt'%index
 	Transport_ratio_document_raw = Transport_ratio.reshape((nant,1))
