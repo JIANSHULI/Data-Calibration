@@ -1,0 +1,160 @@
+import unittest, omnical._omnical as _O
+import random
+import numpy as np
+import scipy as sci
+import aipy as ap
+import scipy.linalg as la
+import commands, os, time, math, ephem
+import omnical.calibration_omni as omni
+
+global overallfactor, diff, calpar, ublfit, correctcalpar, loglist, linlist, cla, clo, diffnorm_O, log
+
+
+#test_testinfo_logcal()
+
+class TestMethods(unittest.TestCase):
+	def test_testinfo_logcal(self):
+		global overallfactor, diff, calpar, ublfit, correctcalpar, diffnorm_O,log
+		#check that logcal give 0 chi2 for all 20 testinfos
+		diff = np.zeros(10)
+		#index=1
+		
+		for index in range(10):
+			#fileindex = index+ 1   #filenames have index that start with 1
+			
+			####Import arrayinfo##########################
+			arrayinfopath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
+			nant = 56
+			calibrator = omni.RedundantCalibrator(nant)
+			calibrator.compute_redundantinfo(arrayinfopath)
+			info = calibrator.Info.get_info()
+			####Config parameters###################################
+			removedegen = True
+			removeadditive = False
+			needrawcal = True #if true, (generally true for raw data) you need to take care of having raw calibration parameters in float32 binary format freq x nant
+			keep_binary_data = True
+			keep_binary_calpar = True
+			converge_percent = 0.00001
+			max_iter = 50
+			step_size = .2
+			####import data##################
+			datapath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_data_%i.txt'%index
+			with open(datapath) as f:
+				rawinfo = [[float(x) for x in line.split()] for line in f]
+			data = np.array([i[0] + 1.0j*i[1] for i in rawinfo[:-1]],dtype = 'complex64')    #last element of rawinfo is empty
+			data = data.reshape((1,1,len(data)))
+			####do calibration################
+			calibrator.removeDegeneracy = removedegen
+			calibrator.removeAdditive = removeadditive
+			calibrator.keepData = keep_binary_data
+			calibrator.keepCalpar = keep_binary_calpar
+			calibrator.convergePercent = converge_percent
+			calibrator.maxIteration = max_iter
+			calibrator.stepSize = step_size
+			calibrator.computeUBLFit = True
+			
+			calibrator.logcal(data, np.zeros_like(data), verbose=True)
+			log = np.copy(calibrator.rawCalpar)
+			calibrator.lincal(data, np.zeros_like(data), verbose=True)
+			lin = np.copy(calibrator.rawCalpar)
+			
+			#log = np.copy(calibrator.rawCalpar)
+			ampcal = log[0,0,3:info['nAntenna']+3]
+			phasecal = log[0,0,info['nAntenna']+3: info['nAntenna']*2+3]
+			calpar = 10**(ampcal)*np.exp(1.0j*phasecal)
+			ublfit = log[0,0,3+2*info['nAntenna']::2]+1.0j*log[0,0,3+2*info['nAntenna']+1::2]
+			
+			ampcal_lin = lin[0,0,3:info['nAntenna']+3]
+			phasecal_lin = lin[0,0,info['nAntenna']+3: info['nAntenna']*2+3]
+			calpar_lin = 10**(ampcal_lin)*np.exp(1.0j*phasecal_lin)
+			ublfit_lin = lin[0,0,3+2*info['nAntenna']::2]+1.0j*lin[0,0,3+2*info['nAntenna']+1::2]
+			####import real calibration parameter
+			calparpath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_Transport_ratio_%i.txt'%index
+			with open(calparpath) as f:
+				rawinfo = [[float(x) for x in line.split()] for line in f]
+			temp = np.array(rawinfo[:-1])
+			correctcalpar = (np.array(temp[:,0]) + 1.0j*np.array(temp[:,1]))[info['subsetant']]
+			###compare calpar with correct calpar
+			overallfactor = abs(np.real(np.mean(ublfit)))**0.5
+			overallfactor_lin = abs(np.real(np.mean(ublfit_lin)))**0.5
+			diffnorm_O = la.norm(calpar*overallfactor - correctcalpar)
+			diffnorm = la.norm(calpar - correctcalpar)
+			diff[index] = la.norm(diffnorm)
+			np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_diff_coc_%i.txt'%index, (calpar*overallfactor - correctcalpar))
+			np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_diff_cc_%i.txt'%index, calpar - correctcalpar)
+			np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_diff_coc_lin_%i.txt'%index, (calpar_lin*overallfactor_lin - correctcalpar))
+			np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_diff_cc_lin_%i.txt'%index, (calpar_lin - correctcalpar))
+			#np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_log_%i.txt'%index, log)
+			#np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_correctcalpar_%i.txt'%index, correctcalpar)
+					
+		self.assertAlmostEqual(np.mean(diff)/nant, 0, 1)
+				        
+		
+	def test_testinfo_lincal(self):
+		
+		global overallfactor, diff, calpar, ublfit, correctcalpar, loglist, linlist, cla, clo
+		for index in range(10):
+		#index = 3      #use the 3rd file to do the test, can also change this to any number from 1 to 20
+			length = 100
+			loglist = np.zeros(length)
+			linlist = np.zeros(length)
+			
+			####import arrayinfo################
+			arrayinfopath =  '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
+			nant = 56
+			calibrator = omni.RedundantCalibrator(nant)
+			calibrator.compute_redundantinfo(arrayinfopath)
+			info = calibrator.Info.get_info()
+			
+			####Config parameters###################################
+			removedegen = True
+			removeadditive = False
+			needrawcal = True #if true, (generally true for raw data) you need to take care of having raw calibration parameters in float32 binary format freq x nant
+			keep_binary_data = True
+			keep_binary_calpar = True
+			converge_percent = 0.00001
+			max_iter = 50
+			step_size = .2
+			
+			####import data##################
+			datapath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_data_%i.txt'%index
+			with open(datapath) as f:
+				rawinfo = [[float(x) for x in line.split()] for line in f]
+			data = np.array([i[0] + 1.0j*i[1] for i in rawinfo[:-1]],dtype = 'complex64')    #last element of rawinfo is empty
+			truedata = data.reshape((1,1,len(data)))
+			std = 0.1
+			
+			####do calibration################
+			calibrator.removeDegeneracy = removedegen
+			calibrator.removeAdditive = removeadditive
+			calibrator.keepData = keep_binary_data
+			calibrator.keepCalpar = keep_binary_calpar
+			calibrator.convergePercent = converge_percent
+			calibrator.maxIteration = max_iter
+			calibrator.stepSize = step_size
+			calibrator.computeUBLFit = True
+			
+			for i in range(1):				
+				#noise = (np.random.normal(scale = std, size = data.shape) + 1.0j*np.random.normal(scale = std, size = data.shape)).astype('complex64')
+				noise = 0
+				data = truedata + noise
+				cla=calibrator.logcal(data, np.zeros_like(data), verbose=True)
+				clo=calibrator.lincal(data, np.zeros_like(data), verbose=True)
+				
+				linchi2 = calibrator.rawCalpar[0,0,2]
+				logchi2 = calibrator.rawCalpar[0,0,1]
+				
+				#linchi2 = (calibrator.rawCalpar[0,0,2]/(info['A'].shape[0] - info['A'].shape[1])/(2*std**2))**0.5
+				#logchi2 = (calibrator.rawCalpar[0,0,1]/(info['A'].shape[0] - info['A'].shape[1])/(2*std**2))**0.5
+				linlist[i] = linchi2
+				loglist[i] = logchi2
+			self.assertTrue(abs(np.mean(linlist)-0.0) < 0.01)
+			#self.assertTrue(abs(np.mean(linlist)-1.0) < 0.01)        #check that chi2 of lincal is close enough to 1
+			#self.assertTrue(np.mean(linlist) < np.mean(loglist))     #chick that chi2 of lincal is smaller than chi2 of logcal 
+			np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_linlist_%i.txt'%index, linlist)
+			np.savetxt('/home/jianshu/Documents/Research/Calibration' + '/Point_test_loglist_%i.txt'%index, loglist)
+	
+	
+#test_testinfo_logcal()
+if __name__ == '__main__':
+    unittest.main()
