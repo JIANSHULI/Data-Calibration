@@ -1,0 +1,186 @@
+import unittest, omnical._omnical as _O
+import random
+import numpy as np
+import scipy as sci
+import aipy as ap
+import scipy.linalg as la
+import commands, os, time, math, ephem
+import omnical.calibration_omni as omni
+
+#K=np.zeros(1,3)
+K=np.array([-1.0,-1.0,-1.0])
+Intensity=1.0
+nx=81
+ny=81
+nant=nx*ny
+
+excluded_array = ''
+excluded_baseline = '' 
+tolerence = '0.0000000001'
+	
+for index in range(10):
+
+	Locations=np.zeros((ny,nx,3))
+	interval=5
+	for Iy in range(ny):
+		for Ix in range(nx):
+			Locations[Iy][Ix][0]=Ix*interval
+			Locations[Iy][Ix][1]=Iy*interval
+	
+	Locations_document=Locations.reshape((nant,3))
+	Locations_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_location_%i.txt'%index
+	np.savetxt('%s'%Locations_path, Locations_document)	
+		
+	#with open(arrayinfo_path,'w') as farray:
+		#farray.writelines("{}\n".format(Locations_document))
+	
+	
+	
+	
+	def receive_ratio(K):
+		return abs(K[2])/la.norm(K)
+	
+	phase_K = -(K[0]*Locations[:,:,0]+K[1]*Locations[:,:,1]+K[2]*Locations[:,:,2])	
+	Receive=Intensity*receive_ratio(K)*np.exp(phase_K*1.0j)
+	
+	Receive_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_receive_%i.txt'%index
+	Receive_document_raw = Receive.reshape((nant,1))
+	Receive_document_refined = np.zeros((nant,2))
+	Receive_document_refined[:,0] = np.real(Receive_document_raw).T
+	Receive_document_refined[:,1] = np.imag(Receive_document_raw).T
+	np.savetxt('%s'%Receive_path, Receive_document_refined)	
+	
+	with open(Receive_path,'a') as freceive:	
+		freceive.write('\n')
+	
+	
+	
+	Transport_ratio_perfect = (np.zeros((ny,nx))+1.0).astype('complex64')
+	#Transport_ratio = (Transport_ratio_perfect + (np.random.rand(ny,nx)-0.5)+(np.random.rand(nx,ny)-0.5)*1.0j).astype('complex64')
+	#Transport_ratio = (Transport_ratio_perfect * (np.random.rand(ny,nx)+0.5) * np.exp((np.random.rand(ny,nx)-0.5)*1.0j).astype('complex64')
+	#Transport_ratio = Transport_ratio_perfect
+	#Transport_ratio[0][0]=( (1+0.2*(np.random.rand()-0.5)) * np.exp((0.2*(np.random.rand()-0.5))*1.0j)).astype('complex64')
+	#Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.3,size=(ny,nx)) * np.exp((np.random.normal(scale=0.05,size=(ny,nx))*1.0j))).astype('complex64')
+	Transport_ratio = (Transport_ratio_perfect * np.random.normal(loc=1,scale=0.05,size=(ny,nx)) * np.exp(((np.random.rand(ny,nx)-0.5)*0.0025*1.0j))).astype('complex64')
+	
+	Transport_ratio_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_Transport_ratio_%i.txt'%index
+	Transport_ratio_document_raw = Transport_ratio.reshape((nant,1))
+	Transport_ratio_document_refined = np.zeros((nant,2))
+	Transport_ratio_document_refined[:,0] = np.real(Transport_ratio_document_raw).T
+	Transport_ratio_document_refined[:,1] = np.imag(Transport_ratio_document_raw).T
+	np.savetxt('%s'%Transport_ratio_path, Transport_ratio_document_refined)	
+	
+	with open(Transport_ratio_path,'a') as ftrans:	
+		ftrans.write('\n')
+	
+	
+	
+	#Data_antenna = Transport_ratio*Receive
+	#Data_antenna_document = Data_antenna.reshape((nant,1))
+	Data_antenna_document = Transport_ratio_document_raw*Receive_document_raw
+	Demonstrate_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_Demonstrate_%i.txt'%index
+	np.savetxt('%s'%Demonstrate_path, Data_antenna_document)	
+	
+	
+	npair = nant*(nant+1)/2
+	pair_index = (np.zeros((npair, 2))).astype(int)
+	data_Raw = (np.zeros((npair, 1))).astype('complex64')
+	data_Refined = (np.zeros((npair, 2)))
+	
+	for p2 in range(nant):
+		for p1 in range(p2+1):
+			order = (1+p2)*p2/2+p1+1
+			pair_index[order-1] = [p1,p2]
+			data_Raw[order-1] = np.conjugate(Data_antenna_document[p1])*Data_antenna_document[p2]
+	data_Refined[:,0] = np.real(data_Raw).T
+	data_Refined[:,1] = np.imag(data_Raw).T
+	
+	pair_index_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_pair_index_%i.txt'%index
+	np.savetxt('%s'%pair_index_path, pair_index, fmt='%i')
+	data_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_data_%i.txt'%index
+	np.savetxt('%s'%data_path, data_Refined)
+	with open(data_path,'a') as fdata:	
+		fdata.write('\n')
+	
+	
+	
+	arrayinfo_path = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_arrayinfo_%i.txt'%index
+	open('%s'%arrayinfo_path, 'a').close()
+	
+	
+	with open(arrayinfo_path,'w') as farray:
+		farray.write("{}\n".format(excluded_array))
+		farray.write("{}\n".format(excluded_baseline))
+		farray.write("{}\n".format(tolerence))
+		
+		for order_loc in range(nant):
+			farray.writelines('%f %f %f\n'%(Locations_document[order_loc][0], Locations_document[order_loc][1], Locations_document[order_loc][2]))
+		
+		for order_pair in range(npair):
+			farray.writelines('%i %i\n'%(pair_index[order_pair][0],pair_index[order_pair][1]))
+		
+		farray.write('\n')
+		
+
+
+
+#def test_testinfo_logcal():
+	##check that logcal give 0 chi2 for all 20 testinfos
+	#diff = np.zeros(20)
+	
+	##for index in range(20):
+	##fileindex = index+1   #filenames have index that start with 1
+	
+	#####Import arrayinfo##########################
+	#arrayinfopath = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_arrayinfo.txt'
+	#nant = 16
+	#calibrator = omni.RedundantCalibrator(nant)
+	#calibrator.compute_redundantinfo(arrayinfopath)
+	#info = calibrator.Info.get_info()
+	#####Config parameters###################################
+	#removedegen = True
+	#removeadditive = False
+	#needrawcal = True #if true, (generally true for raw data) you need to take care of having raw calibration parameters in float32 binary format freq x nant
+	#keep_binary_data = True
+	#keep_binary_calpar = True
+	#converge_percent = 0.00001
+	#max_iter = 50
+	#step_size = .2
+	#####import data##################
+	#datapath = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_data.txt'
+	#with open(datapath) as f:
+		#rawinfo = [[float(x) for x in line.split()] for line in f]
+	#data = np.array([i[0] + 1.0j*i[1] for i in rawinfo[:-1]],dtype = 'complex64')    #last element of rawinfo is empty
+	#data = data.reshape((1,1,len(data)))
+	#####do calibration################
+	#calibrator.removeDegeneracy = removedegen
+	#calibrator.removeAdditive = removeadditive
+	#calibrator.keepData = keep_binary_data
+	#calibrator.keepCalpar = keep_binary_calpar
+	#calibrator.convergePercent = converge_percent
+	#calibrator.maxIteration = max_iter
+	#calibrator.stepSize = step_size
+	#calibrator.computeUBLFit = True
+	
+	#calibrator.logcal(data, np.zeros_like(data), verbose=True)
+	#log = np.copy(calibrator.rawCalpar)
+	##log = np.copy(calibrator.rawCalpar)
+	#ampcal = log[0,0,3:info['nAntenna']+3]
+	#phasecal = log[0,0,info['nAntenna']+3: info['nAntenna']*2+3]
+	#calpar = 10**(ampcal)*np.exp(1.0j*phasecal)
+	#ublfit = log[0,0,3+2*info['nAntenna']::2]+1.0j*log[0,0,3+2*info['nAntenna']+1::2]
+	#####import real calibration parameter
+	#calparpath = os.path.dirname(os.path.realpath(__file__)) + '/Point_test_Transport_ratio.txt'
+	#with open(calparpath) as f:
+		#rawinfo = [[float(x) for x in line.split()] for line in f]
+	#temp = np.array(rawinfo[:-1])
+	#correctcalpar = (np.array(temp[:,0]) + 1.0j*np.array(temp[:,1]))[info['subsetant']]
+	####compare calpar with correct calpar
+	#overallfactor = np.real(np.mean(ublfit))**0.5
+	#diffnorm = la.norm(calpar*overallfactor - correctcalpar)
+	#diff[index] = la.norm(diffnorm)
+	
+	#self.assertAlmostEqual(la.norm(diff), 0, 4)
+
+#test_testinfo_logcal()
+
