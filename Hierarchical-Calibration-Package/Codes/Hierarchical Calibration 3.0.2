@@ -12,21 +12,23 @@ from matplotlib import pyplot as plt
 
 
 
-main_array = [9,9]
-nant=main_array[0]*main_array[1]
+main_array = [27,27]
+nant = main_array[0]*main_array[1]
 
 
 hier_ways = 1
-mini_cell = [[3,3],[9,9],[81,81]]
+mini_cell = [[3,3],[27,27]]
+#mini_cell = [[4,4],[16,16],[256,256]]
+#mini_cell = [[3,3],[9,9],[81,81]]
 
 
-nfile = 10
-range_noise = 14
-ntimes = 100
+nfile = 1
+range_noise = 4
+ntimes = 20
 #index=5
 
 
-min_noise = -49.0
+min_noise = -31.0
 step_noise = 3.0
 deviation = np.zeros(range_noise)
 deviation = [10**((min_noise+magnitude_noise*step_noise)/10.0) for magnitude_noise in range(range_noise)]
@@ -60,12 +62,12 @@ for LEV in range(hier_ways):
 	
 	for index in range(nfile):
 		
-		arrayinfopath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_arrayinfo_%i.txt'%index
-		#arrayinfopath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
-		datapath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_data_%i.txt'%index
-		#datapath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_data_%i.txt'%index
-		receivepath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_receive_%i.txt'%index
-		#receivepath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_receive_%i.txt'%index
+		#arrayinfopath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_arrayinfo_%i.txt'%index
+		arrayinfopath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
+		#datapath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_data_%i.txt'%index
+		datapath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_data_%i.txt'%index
+		#receivepath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_receive_%i.txt'%index
+		receivepath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_receive_%i.txt'%index
 		
 		
 		#calibrator = omni.RedundantCalibrator(nant)
@@ -217,8 +219,8 @@ for LEV in range(hier_ways):
 							#submatrix_raw[xdex][ydex] = submatrix_loc[ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] 
 							#submatrix_refined[xdex][ydex] = submatrix_raw[xdex][ydex].reshape(ncell,3)
 							
-							submatrix_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/Sublocation_%i_%i_%i.txt'%(lev,xdex,ydex)
-							#submatrix_path = '/home/jianshu/Documents/Research/Calibration'  + '/Codes/Data/Sublocation_%i_%i_%i.txt'%(lev,xdex,ydex)
+							#submatrix_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/Sublocation_%i_%i_%i.txt'%(lev,xdex,ydex)
+							submatrix_path = '/home/jianshu/Documents/Research/Calibration'  + '/Codes/Data/Sublocation_%i_%i_%i.txt'%(lev,xdex,ydex)
 							np.savetxt('%s'%submatrix_path, submatrix_refined[lev-1][xdex][ydex])
 							
 							for p2 in range(ncell):
@@ -264,8 +266,8 @@ for LEV in range(hier_ways):
 							
 							
 									
-							submatrix_path_info = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subinfo_%i_%i_%i.txt'%(lev,xdex,ydex)
-							#submatrix_path_info = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subinfo_%i_%i_%i.txt'%(lev,xdex,ydex)
+							#submatrix_path_info = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subinfo_%i_%i_%i.txt'%(lev,xdex,ydex)
+							submatrix_path_info = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subinfo_%i_%i_%i.txt'%(lev,xdex,ydex)
 							open('%s'%submatrix_path_info, 'a').close()						
 							with open(submatrix_path_info,'w') as finfo:				
 								for suborder in range(len(submatrix_info_temp)):
@@ -288,12 +290,12 @@ for LEV in range(hier_ways):
 							submatrix_exbline[xdex][ydex] = np.array(submatrix_exbline[xdex][ydex])
 							submatrix_exarray[xdex][ydex] = np.array(submatrix_exarray[xdex][ydex])
 				
-							submatrix_path_pair = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subpair_%i_%i_%i.txt'%(lev,xdex,ydex)
-							#submatrix_path_pair = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subpair_%i_%i_%i.txt'%(lev,xdex,ydex)
+							#submatrix_path_pair = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subpair_%i_%i_%i.txt'%(lev,xdex,ydex)
+							submatrix_path_pair = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subpair_%i_%i_%i.txt'%(lev,xdex,ydex)
 							np.savetxt('%s'%submatrix_path_pair, submatrix_pair[xdex][ydex],fmt='%i')
 							
-							submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i.txt'%(lev,xdex,ydex)
-							#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i.txt'%(lev,xdex,ydex)
+							#submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i.txt'%(lev,xdex,ydex)
+							submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i.txt'%(lev,xdex,ydex)
 							np.savetxt('%s'%submatrix_path_data, submatrix_data[xdex][ydex])
 							with open(submatrix_path_data,'a') as fdata:	
 								fdata.write('\n')
@@ -339,8 +341,8 @@ for LEV in range(hier_ways):
 							DOF = DOF + info['A'].shape[0] - info['A'].shape[1]			
 				
 				                       
-							submatrix_path_calpar = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subcalpar_%i_%i_%i.txt'%(lev,xdex,ydex)
-							#submatrix_path_calpar = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subcalpar_%i_%i_%i.txt'%(lev,xdex,ydex)
+							#submatrix_path_calpar = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subcalpar_%i_%i_%i.txt'%(lev,xdex,ydex)
+							submatrix_path_calpar = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subcalpar_%i_%i_%i.txt'%(lev,xdex,ydex)
 							np.savetxt('%s'%submatrix_path_calpar, submatrix_calpar_Refined[lev-1][xdex][ydex])
 							with open(submatrix_path_calpar,'a') as fcalpar:	
 								fcalpar.write('\n')
@@ -352,8 +354,8 @@ for LEV in range(hier_ways):
 						
 				
 				
-				submatrix_path_transcoef = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_Transport_ratio_%i.txt'%index
-				#submatrix_path_transcoef = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_Transport_ratio_%i.txt'%index
+				#submatrix_path_transcoef = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_Transport_ratio_%i.txt'%index
+				submatrix_path_transcoef = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_Transport_ratio_%i.txt'%index
 				with open(submatrix_path_transcoef) as ftrans:
 					rawtrans = [[float(x) for x in line.split()] for line in ftrans]
 				temp = np.array(rawtrans[:-1])
@@ -408,13 +410,13 @@ for LEV in range(hier_ways):
 					
 					for xdex in range(cell[0]**(lev-2)):
 						for ydex in range(cell[1]**(lev-2)):
-							submatrix_calpar_amplitude_select[lev-1][xdex][ydex] = 	submatrix_calpar_amplitude[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], cell[0]-1, cell[1]-1 ] 	
-							amplitude_shift[ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] = submatrix_calpar_amplitude_calibrated[lev-2][xdex][ydex].reshape((cell[0],cell[1])) - submatrix_calpar_amplitude_select[lev-1][xdex][ydex]
+							submatrix_calpar_amplitude_select[lev-1][xdex][ydex] = 	submatrix_calpar_amplitude[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], ncell-1 ] 	
+							amplitude_shift[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] = submatrix_calpar_amplitude_calibrated[lev-2][xdex][ydex].reshape((cell[0],cell[1])) - submatrix_calpar_amplitude_select[lev-1][xdex][ydex]
 										
 					for xdex in range(cell[0]**(lev-2)):
 						for ydex in range(cell[1]**(lev-2)):
-							submatrix_calpar_phase_select[lev-1][xdex][ydex] = 	submatrix_calpar_phase[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], cell[0]-1, cell[1]-1 ] 	
-							phase_shift[ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] = submatrix_calpar_phase_calibrated[lev-2][xdex][ydex].reshape((cell[0],cell[1])) - submatrix_calpar_phase_select[lev-1][xdex][ydex]
+							submatrix_calpar_phase_select[lev-1][xdex][ydex] = 	submatrix_calpar_phase[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], ncell-1 ] 	
+							phase_shift[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] = submatrix_calpar_phase_calibrated[lev-2][xdex][ydex].reshape((cell[0],cell[1])) - submatrix_calpar_phase_select[lev-1][xdex][ydex]
 					
 					
 					#amplitude_shift[lev-1] = submatrix_calpar_amplitude_calibrated[lev-2].reshape(ncell,1) - submatrix_calpar_amplitude[lev-1][:, :, ncell-1].reshape(ncell,1)
@@ -438,8 +440,8 @@ for LEV in range(hier_ways):
 								calpar_calibrated_original[origin_order1] = 0.0
 			
 				if trial ==ntimes-1:
-					calibrated_path_calpar = os.path.dirname(os.path.realpath(__file__)) + '/Data/calpar_calibrated_%i_%i_%i.txt'%(LEV,index,magnitude_noise)
-					#calibrated_path_calpar = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/calpar_calibrated_%i_%i_%i.txt'%(LEV,index,magnitude_noise)
+					#calibrated_path_calpar = os.path.dirname(os.path.realpath(__file__)) + '/Data/calpar_calibrated_%i_%i_%i.txt'%(LEV,index,magnitude_noise)
+					calibrated_path_calpar = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/calpar_calibrated_%i_%i_%i_[%i, %i].txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1])
 					np.savetxt('%s'%calibrated_path_calpar, calpar_calibrated_original)
 					with open(calibrated_path_calpar,'a') as fcalibrated:	
 						fcalibrated.write('\n')
