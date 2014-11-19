@@ -470,16 +470,16 @@ for LEV in range(hier_ways):
 			chi2_multi[LEV][index][magnitude_noise] = np.mean(chi2)
 			
 			
-		chi2_multi_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/chi2_%i_[%i, %i].txt'%(LEV,main_array[0],main_array[1])
-		#chi2_multi_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/chi2_%i_%i_[%i, %i].txt'%(LEV,index,main_array[0],main_array[1])
+		chi2_multi_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/chi2_%i_[%i, %i]_%i.txt'%(LEV,main_array[0],main_array[1],DOF)
+		#chi2_multi_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/chi2_%i_%i_[%i, %i]_%i.txt'%(LEV,index,main_array[0],main_array[1],DOF)
 		np.savetxt('%s'%chi2_multi_path, chi2_multi[LEV][index])
 		with open(chi2_multi_path,'a') as fchi2:	
 			fchi2.write('\n')	
 	
 	
 
-	chi2_multi_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/chi2_%i_[%i, %i].txt'%(LEV,main_array[0],main_array[1])
-	#chi2_multi_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/chi2_%i_[%i, %i].txt'%(LEV,main_array[0],main_array[1])
+	chi2_multi_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/chi2_%i_[%i, %i]_%i.txt'%(LEV,main_array[0],main_array[1],DOF)
+	#chi2_multi_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/chi2_%i_[%i, %i]_%i.txt'%(LEV,main_array[0],main_array[1],DOF)
 	np.savetxt('%s'%chi2_multi_path, chi2_multi[LEV])
 	with open(chi2_multi_path,'a') as fchi2:	
 		fchi2.write('\n')
