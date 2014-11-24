@@ -23,15 +23,15 @@ mini_cell = [[4,4],[16,16],[256,256]]
 #mini_cell = [[9,9],[81,81]]
 
 
-nfile = 1
-range_noise = 1
-ntimes = 1
+nfile = 4
+range_noise = 6
+ntimes = 50
 general_scale = 1.0
 #index=5
 
 
-min_noise = -20.0
-step_noise = 1.5
+min_noise = -30.0
+step_noise = 5
 deviation = np.zeros(range_noise)
 deviation = [10**((min_noise+magnitude_noise*step_noise)/10.0) for magnitude_noise in range(range_noise)]
 
@@ -568,10 +568,10 @@ for LEV in range(hier_ways):
 					
 					calpar_calibrated_original_mean = calpar_calibrated_original_mean/ntimes
 					calpar_uncalibrated_original_mean = calpar_uncalibrated_original_mean/ntimes
-					diff_vector_mean[LEV][index][magnitude_noise] = diff_vector_mean/ntimes
-					diff_vector_uncal_mean[LEV][index][magnitude_noise] = diff_vector_uncal_mean/ntimes
-					diff_scale_mean[LEV][index][magnitude_noise] = diff_scale_mean/ntimes
-					diff_scale_uncal_mean[LEV][index][magnitude_noise] = diff_scale_uncal_mean/ntimes
+					diff_vector_mean[LEV][index][magnitude_noise] = diff_vector_mean[LEV][index][magnitude_noise]/ntimes
+					diff_vector_uncal_mean[LEV][index][magnitude_noise] = diff_vector_uncal_mean[LEV][index][magnitude_noise]/ntimes
+					diff_scale_mean[LEV][index][magnitude_noise] = diff_scale_mean[LEV][index][magnitude_noise]/ntimes
+					diff_scale_uncal_mean[LEV][index][magnitude_noise] = diff_scale_uncal_mean[LEV][index][magnitude_noise]/ntimes
 					
 				
 					#calibrated_path_calpar = os.path.dirname(os.path.realpath(__file__)) + '/Data/calpar_calibrated_%i_%i_%i.txt'%(LEV,index,magnitude_noise)
