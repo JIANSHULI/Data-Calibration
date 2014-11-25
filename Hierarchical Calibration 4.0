@@ -406,7 +406,7 @@ for LEV in range(hier_ways):
 							
 							if lev == levels:
 								
-								chi2[trial] = chi2[trial] + lin[0][0][2]/(deviation[magnitude_noise])**2
+								chi2[trial] = chi2[trial] + lin[0][0][2]/2*(deviation[magnitude_noise])**2
 							
 							if lev > 1:	
 								phase_order = [0, len(calibrator.Info.ubl)//2]
