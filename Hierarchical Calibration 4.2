@@ -12,25 +12,25 @@ from matplotlib import pyplot as plt
 
 
 
-main_array = [9,9]
+main_array = [16,16]
 nant = main_array[0]*main_array[1]
 
 
-hier_ways = 1
+hier_ways = 2
 #mini_cell = [[3,3],[27,27]]
-#mini_cell = [[4,4],[16,16],[256,256]]
-mini_cell = [[3,3],[9,9],[81,81]]
+mini_cell = [[4,4],[16,16],[256,256]]
+#mini_cell = [[3,3],[9,9],[81,81]]
 #mini_cell = [[9,9],[81,81]]
 #mini_cell = [[16,16],[256,256]]
 
-nfile = 2
-range_noise = 2
-ntimes = 5
+nfile = 6
+range_noise = 6
+ntimes = 50
 general_scale = 1.0
 #index=5
 
 
-min_noise = -25.0
+min_noise = -30.0
 step_noise = 5
 deviation = np.zeros(range_noise)
 deviation = [10**((min_noise+magnitude_noise*step_noise)/10.0) for magnitude_noise in range(range_noise)]
@@ -80,39 +80,40 @@ for LEV in range(hier_ways):
 	for index in range(nfile):
 		
 		if index == 0:
+			if LEV ==0:
 					
-			#arrayinfopath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_arrayinfo_%i.txt'%index
-			arrayinfopath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
-			#receivepath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_receive_%i.txt'%index
-			receivepath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_receive_%i.txt'%index
-			
-			
-			#calibrator = omni.RedundantCalibrator(nant)
-			#calibrator.compute_redundantinfo(arrayinfopath)
-			#info = calibrator.Info.get_info()
-			
-			
-			with open(arrayinfopath) as f:
-				rawinfo = [[float(x) for x in line.split()] for line in f]
+				#arrayinfopath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_arrayinfo_%i.txt'%index
+				arrayinfopath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
+				#receivepath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_receive_%i.txt'%index
+				receivepath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_receive_%i.txt'%index
 				
-			
-			with open(receivepath) as f:
-				rawreceive = [[float(x) for x in line.split()] for line in f]
-			
-			excluded_array = rawinfo[0]
-			excluded_baseline_raw = rawinfo[1]
-			excluded_baseline_refined = [[excluded_baseline_raw[2*b], excluded_baseline_raw[2*b+1]] for b in range(len(excluded_baseline_raw)//2)]
-			tolerence = rawinfo[2]		
-			loc_info = rawinfo[3:(3+nant)]
-			pair_info = rawinfo[(3+nant):]
-	
-			receive_info = np.array([i[0] + 1.0j*i[1] for i in rawreceive[:-1]],dtype = 'complex64')
-	
-			
-			loc_info_tuple = [ tuple(loc_info[i]) for i in range(len(loc_info)) ]
-			loc_info_tuple_sorted = sorted(loc_info_tuple, key=itemgetter(0,1,2))
-			loc_info_matrix = (np.array(loc_info_tuple_sorted)).reshape(cell[0]**levels,cell[1]**levels,3)
-			submatrix_loc = loc_info_matrix
+				
+				#calibrator = omni.RedundantCalibrator(nant)
+				#calibrator.compute_redundantinfo(arrayinfopath)
+				#info = calibrator.Info.get_info()
+				
+				
+				with open(arrayinfopath) as f:
+					rawinfo = [[float(x) for x in line.split()] for line in f]
+					
+				
+				with open(receivepath) as f:
+					rawreceive = [[float(x) for x in line.split()] for line in f]
+				
+				excluded_array = rawinfo[0]
+				excluded_baseline_raw = rawinfo[1]
+				excluded_baseline_refined = [[excluded_baseline_raw[2*b], excluded_baseline_raw[2*b+1]] for b in range(len(excluded_baseline_raw)//2)]
+				tolerence = rawinfo[2]		
+				loc_info = rawinfo[3:(3+nant)]
+				pair_info = rawinfo[(3+nant):]
+		
+				receive_info = np.array([i[0] + 1.0j*i[1] for i in rawreceive[:-1]],dtype = 'complex64')
+		
+				
+				loc_info_tuple = [ tuple(loc_info[i]) for i in range(len(loc_info)) ]
+				loc_info_tuple_sorted = sorted(loc_info_tuple, key=itemgetter(0,1,2))
+				loc_info_matrix = (np.array(loc_info_tuple_sorted)).reshape(cell[0]**levels,cell[1]**levels,3)
+				submatrix_loc = loc_info_matrix
 			
 			submatrix_info = [None]*levels
 			submatrix_refined = [None]*levels
