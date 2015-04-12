@@ -1,0 +1,934 @@
+import unittest, omnical._omnical as _O
+import cmath, math
+import random
+import numpy as np
+import scipy as sci
+#import aipy as ap
+import scipy.linalg as la
+import commands, os, time, math, ephem
+import omnical.calibration_omni as omni
+from operator import itemgetter, attrgetter, methodcaller
+from matplotlib import pyplot as plt
+
+
+
+main_array = [9,9]
+nant = main_array[0]*main_array[1]
+ronp = 0
+
+ron = 0 #Non-zero only if using whole antennas; If you want to do reduced hierarchical calibration. do reducing in "Set up Data" file 
+whole == 0 # Set up whole=1 and ron=0 to generate "subinfor" file for mutative redundancy calibration
+
+max_iter = 50
+
+
+hier_ways = 2
+#mini_cell = [[3,3],[27,27]]
+#mini_cell = [[4,4],[16,16],[256,256]]
+mini_cell = [[3,3],[9,9],[81,81]]
+#mini_cell = [[9,9],[81,81]]
+#mini_cell = [[16,16],[256,256]]
+#mini_cell = [[12,12]]
+#mini_cell = [[9,9]]
+#mini_cell = [[7,7]]
+#mini_cell = [[5,5]]
+#mini_cell = [[3,3]]
+
+nfile = 1
+range_noise = 7
+ntimes = 51
+period = 10
+general_scale = 1.0
+
+
+min_noise = -35.0
+step_noise = 5
+deviation = np.zeros(range_noise) 
+deviation = [10**((min_noise+magnitude_noise*step_noise)/10.0) for magnitude_noise in range(range_noise)]
+
+
+chi2_multi = np.zeros((hier_ways,nfile,range_noise))
+chi2_multi_Refined = np.zeros((hier_ways, range_noise))
+DOF = np.zeros(hier_ways)
+
+
+diff_scale = np.zeros((hier_ways,nfile,range_noise))
+diff_vector = np.zeros((hier_ways,nfile,range_noise,nant)).astype('complex64')
+diff_scale_mean = np.zeros((hier_ways,nfile,range_noise))
+diff_vector_mean = np.zeros((hier_ways,nfile,range_noise,nant)).astype('complex64')
+
+diff_scale_Refined = np.zeros((hier_ways, range_noise))
+
+
+
+for LEV in range(hier_ways):
+
+	cell = mini_cell[LEV] #(side>=3)#
+	ncell = cell[0]*cell[1]
+	levels = int(math.log(main_array[0], mini_cell[LEV][0]))
+	nstandards = 3
+	dimension = 2
+	
+	
+	standard_origin_order = [None]*nstandards
+	order_standard = [ncell-1, ncell-(cell[0]//2)*cell[1], ncell-(cell[0]-1)*cell[1]-2]
+	
+	
+	calibrators = [None]*levels
+	infos = [None]*levels
+	
+	
+	for index in range(nfile):
+		
+		##submatrix_path_transcoef = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_Transport_ratio_%i.txt'%index
+		#submatrix_path_transcoef = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_Transport_ratio_%i.txt'%index
+		#with open(submatrix_path_transcoef) as ftrans:
+			#rawtrans = [[float(x) for x in line.split()] for line in ftrans]
+		#temp = np.array(rawtrans[:-1])
+		#correctcalpar = (np.array(temp[:,0]) + 1.0j*np.array(temp[:,1]))#[info['subsetant']]
+		#for i in range(nant):
+			#if i in excluded_array:
+				#correctcalpar[i] = 0.0
+		
+
+		
+		#standard_origin_order[0] = loc_info_tuple.index(tuple(submatrix_refined[0][0][0][order_standard[0]]))
+		#standard_origin_order[1] = loc_info_tuple.index(tuple(submatrix_refined[0][0][0][order_standard[1]]))
+		#standard_origin_order[2] = loc_info_tuple.index(tuple(submatrix_refined[0][0][0][order_standard[2]]))
+		
+		
+		
+		#standard_calpar_a = np.array([[np.real(np.log10(correctcalpar[standard_origin_order[stand_order]]))*1.0, np.imag(np.log(correctcalpar[standard_origin_order[stand_order]]))*1.0]
+									#for stand_order in range(nstandards)]).astype('float64')
+		
+		
+		if index == 0:
+			if LEV ==0:
+					
+				#arrayinfopath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_arrayinfo_%i.txt'%index
+				arrayinfopath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_arrayinfo_%i.txt'%index
+				#receivepath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_receive_%i.txt'%index
+				receivepath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_receive_%i.txt'%index
+				
+				
+				
+				
+				with open(arrayinfopath) as f:
+					rawinfo = [[float(x) for x in line.split()] for line in f]
+					
+				
+				with open(receivepath) as f:
+					rawreceive = [[float(x) for x in line.split()] for line in f]
+				
+				excluded_array = rawinfo[0]
+				excluded_baseline_raw = rawinfo[1]
+				excluded_baseline_refined = [[excluded_baseline_raw[2*b], excluded_baseline_raw[2*b+1]] for b in range(len(excluded_baseline_raw)//2)]
+				tolerence = rawinfo[2]		
+				loc_info = rawinfo[3:(3+nant)]
+				pair_info = rawinfo[(3+nant):]
+		
+				receive_info = np.array([i[0] + 1.0j*i[1] for i in rawreceive[:-1]],dtype = 'complex64')
+		
+				
+				loc_info_tuple = [ tuple(loc_info[i]) for i in range(len(loc_info)) ]
+				loc_info_tuple_sorted = sorted(loc_info_tuple, key=itemgetter(0,1,2))
+				loc_info_matrix = (np.array(loc_info_tuple_sorted)).reshape(cell[0]**levels,cell[1]**levels,3)
+				submatrix_loc = loc_info_matrix
+			
+			else:
+				submatrix_loc = loc_info_matrix
+			
+			submatrix_info = [None]*levels
+			submatrix_refined = [None]*levels
+			submatrix_data_pure = [None]*levels
+			submatrix_data = [None]*levels
+		
+
+		#datapath = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_data_%i.txt'%index
+		datapath = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_data_%i.txt'%index
+		with open(datapath) as f:
+			rawdata = [[float(x) for x in line.split()] for line in f]
+		data_pure = np.array([i[0] + 1.0j*i[1] for i in rawdata[:-1]],dtype = 'complex64')    #last element of rawinfo is empty
+		
+		
+		for magnitude_noise in range(range_noise):
+			
+			for trial in range(ntimes):
+				
+				#noise = (np.random.normal(scale = deviation[magnitude_noise], size = data_pure.shape) + 1.0j*np.random.normal(scale = deviation[magnitude_noise], size = data_pure.shape)).astype('complex64')
+				#data = data_pure + noise*general_scale
+
+				
+				submatrix_calpar_Refined = [None]*levels
+				submatrix_calpar_amplitude = [None]*levels
+				submatrix_calpar_phase = [None]*levels
+				submatrix_transcoef_Refined = [None]*levels
+				
+				 
+				submatrix_calpar_amplitude_select = [None]*levels
+				submatrix_calpar_phase_select = [None]*levels			
+				
+				
+				submatrix_calpar_Refined_calibrated = [None]*levels
+				submatrix_calpar_Refined_phasecalibrated = [None]*levels
+				submatrix_calpar_amplitude_calibrated = [None]*levels
+				submatrix_calpar_phase_calibrated = [None]*levels
+				submatrix_calpar_phase_calibrated_p = [None]*levels
+				amplitude_shift = [None]*levels
+				phase_shift = [None]*levels
+				phase_shift_p = [None]*levels
+				
+				calpar_calibrated_original = np.zeros(ncell**levels).astype('complex64')
+				calpar_calibrated_original_mean = np.zeros(ncell**levels).astype('complex64')
+				DOF[LEV] = 0
+				
+				
+				for lev in range(levels,0,-1):
+					
+								
+					submatrix_calpar_Raw = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),cell[0],cell[1])).astype('complex64')
+					submatrix_calpar_Refined[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell)).astype('complex64')
+					submatrix_calpar_amplitude[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell))
+					submatrix_calpar_phase[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell))
+					
+					
+					submatrix_calpar_amplitude_select[lev-1] = np.zeros((cell[0]**(lev-2),cell[1]**(lev-2),cell[0],cell[1]))
+					submatrix_calpar_phase_select[lev-1] = np.zeros((cell[0]**(lev-2),cell[1]**(lev-2),cell[0],cell[1]))
+					
+					
+					submatrix_calpar_Refined_calibrated[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell)).astype('complex64')
+					submatrix_calpar_Refined_phasecalibrated[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell)).astype('complex64')
+					submatrix_calpar_amplitude_calibrated[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell))
+					submatrix_calpar_phase_calibrated[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell))
+					submatrix_calpar_phase_calibrated_p[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell))
+					
+					
+					phase_shift_p [lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell))
+					amplitude_shift[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1)))
+					if lev==1:
+						phase_shift[lev-1] = np.zeros(ncell)
+					else:
+						phase_shift[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1)))	
+
+
+					if index == 0:
+						if magnitude_noise == 0:
+							if trial == 0:
+								
+								calibrators[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+								infos[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+								
+								submatrix_refined[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell,3))
+
+								#submatrix_data_pure[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+								#submatrix_data[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+								
+								#if ncell == nant:																									
+																		
+									#submatrix_refined[0][0][0] = loc_info_tuple_sorted
+									
+									#calibrators[lev-1][0][0] = omni.RedundantCalibrator(ncell)
+									#(calibrators[lev-1][0][0]).compute_redundantinfo(arrayinfopath)
+									#infos[lev-1][0][0] = calibrators[lev-1][0][0].Info.get_info()
+									
+									#ubl = infos[lev-1][0][0]['ublindex']
+									#nubl = infos[lev-1][0][0]['nUBL']
+									#count_ubl = infos[lev-1][0][0]['ublcount']
+									#order_ubl = np.argsort(count_ubl)[::-1]
+									#exbls = np.zeros([len(ubl),len(ubl[0][0])-1])
+									
+									#lower = 0
+									#upper = nubl
+									
+									#for ex in range(lower,upper):
+										#exbls[ex] = ubl[order_ubl[ex]][0][0:2]
+										
+									
+									#ex_refined = np.array(exbls).reshape(1,len(exbls)*len(exbls[0]))
+									#ex_refined = ex_refined.astype(int)
+									
+									##ubl_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+									#ubl_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+									#np.savetxt('%s'%ubl_path, ex_refined,fmt='%i')
+									#with open(ubl_path,'a') as fubl:	
+										#fubl.write('\n')									
+									
+									
+								if ncell != nant or (whole == 1 and ron == 0):	
+									
+									submatrix_refined_temp = np.zeros(3)
+						
+									submatrix_raw = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),cell[0],cell[1],3))
+									#submatrix_refined[lev-1] = np.zeros((cell[0]**(lev-1),cell[1]**(lev-1),ncell,3))								
+									
+									submatrix_exarray = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+									submatrix_exbline = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+									submatrix_tolerence = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+									submatrix_pair = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+									
+									submatrix_info[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+									
+									
+									
+									for xdex in range(cell[0]**(lev-1)):
+										for ydex in range(cell[1]**(lev-1)):
+											
+											submatrix_exbline_temp = []
+											submatrix_exarray_temp = []
+											submatrix_tolerence_temp = tolerence
+											submatrix_pair_temp = []
+											#submatrix_data_temp = []#
+											
+											if lev==levels:
+												submatrix_raw[xdex][ydex] = submatrix_loc[ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] 
+												submatrix_refined[lev-1][xdex][ydex] = submatrix_raw[xdex][ydex].reshape(ncell,3)
+												
+												origin_order3 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][order_standard[0]]))      
+												if origin_order3 in excluded_array:
+													for p3 in range(ncell-2,-1,-1):
+														origin_order4 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p3]))
+														if not (origin_order4 in excluded_array):
+															submatrix_refined[lev-1][xdex][ydex][ncell-1] = submatrix_refined[lev-1][xdex][ydex][p3]
+															submatrix_refined[lev-1][xdex][ydex][p3] = submatrix_raw[xdex][ydex][cell[0]-1][cell[1]-1]
+															break
+															
+												origin_order3 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][order_standard[1]]))      
+												if origin_order3 in excluded_array:
+													for p3 in range(ncell-3,-1,-1):
+														origin_order4 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p3]))
+														if not (origin_order4 in excluded_array):
+															submatrix_refined[lev-1][xdex][ydex][ncell-2] = submatrix_refined[lev-1][xdex][ydex][p3]
+															submatrix_refined[lev-1][xdex][ydex][p3] = submatrix_raw[xdex][ydex][cell[0]-1][cell[1]-2]
+															break
+															
+												origin_order3 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][order_standard[2]]))      
+												if origin_order3 in excluded_array:
+													for p3 in range(ncell-1-cell[1],-1,-1):
+														origin_order4 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p3]))
+														if not (origin_order4 in excluded_array):
+															submatrix_refined[lev-1][xdex][ydex][ncell-1-cell[1]] = submatrix_refined[lev-1][xdex][ydex][p3]
+															submatrix_refined[lev-1][xdex][ydex][p3] = submatrix_raw[xdex][ydex][cell[0]-2][cell[1]-1]
+															break
+																													
+												submatrix_raw[xdex][ydex] = submatrix_refined[lev-1][xdex][ydex].reshape((cell[0],cell[1],3))	
+													
+											else:
+												submatrix_raw[xdex][ydex] = submatrix_loc[ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], cell[0]-1, cell[1]-1 ] 
+												submatrix_refined[lev-1][xdex][ydex] = submatrix_raw[xdex][ydex].reshape(ncell,3)
+												
+												origin_order5 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][order_standard[0]]))      
+												if origin_order5 in excluded_array:
+													for p1 in range(ncell-2,-1,-1):
+														origin_order6 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))
+														if not (origin_order6 in excluded_array):
+															submatrix_refined[lev-1][xdex][ydex][ncell-1] = submatrix_refined[lev-1][xdex][ydex][p1]
+															submatrix_refined[lev-1][xdex][ydex][p1] = submatrix_raw[xdex][ydex][cell[0]-1][cell[1]-1]
+															break
+															
+												origin_order5 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][order_standard[1]]))      
+												if origin_order5 in excluded_array:
+													for p3 in range(ncell-3,-1,-1):
+														origin_order6 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p3]))
+														if not (origin_order6 in excluded_array):
+															submatrix_refined[lev-1][xdex][ydex][ncell-2] = submatrix_refined[lev-1][xdex][ydex][p3]
+															submatrix_refined[lev-1][xdex][ydex][p3] = submatrix_raw[xdex][ydex][cell[0]-1][cell[1]-2]
+															break
+															
+												origin_order5 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][order_standard[2]]))      
+												if origin_order5 in excluded_array:
+													for p3 in range(ncell-1-cell[1],-1,-1):
+														origin_order6 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p3]))
+														if not (origin_order6 in excluded_array):
+															submatrix_refined[lev-1][xdex][ydex][ncell-1-cell[1]] = submatrix_refined[lev-1][xdex][ydex][p3]
+															submatrix_refined[lev-1][xdex][ydex][p3] = submatrix_raw[xdex][ydex][cell[0]-2][cell[1]-1]
+															break
+																										
+												submatrix_raw[xdex][ydex] = submatrix_refined[lev-1][xdex][ydex].reshape((cell[0],cell[1],3))	
+																
+											
+											
+											for p2 in range(ncell):
+												origin_order2 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p2]))      
+												if origin_order2 in excluded_array:
+													submatrix_exarray_temp.append(p2)
+												
+												for p1 in range(ncell):
+													
+													origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))									
+													
+													if [origin_order1, origin_order2] in pair_info:
+														origin_order_pair = pair_info.index([origin_order1,origin_order2])
+														submatrix_pair_temp.append([p1,p2])
+														#submatrix_data_temp.append(data_pure[origin_order_pair])#
+														
+													if [origin_order1, origin_order2] in excluded_baseline_refined:
+														submatrix_exbline_temp.append(p1)
+														submatrix_exbline_temp.append(p2)
+														
+											
+											
+											#submatrix_data_pure[lev-1][xdex][ydex] = submatrix_data_temp#									
+											#submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_pure[lev-1][xdex][ydex]).reshape(len(submatrix_data_pure[lev-1][xdex][ydex]),1)#
+																									
+											submatrix_pair[xdex][ydex] = submatrix_pair_temp
+											submatrix_exbline[xdex][ydex] = submatrix_exbline_temp
+											if len(submatrix_exarray_temp)==0:
+												submatrix_exarray[xdex][ydex]=[-1]
+											else:
+												submatrix_exarray[xdex][ydex] = submatrix_exarray_temp
+											submatrix_tolerence[xdex][ydex] = submatrix_tolerence_temp
+											
+											submatrix_info_temp = [None]*(3+len(submatrix_refined[lev-1][xdex][ydex])+len(submatrix_pair[xdex][ydex]))
+											submatrix_info_temp[0] = submatrix_exarray[xdex][ydex]
+											submatrix_info_temp[1] = submatrix_exbline[xdex][ydex]
+											submatrix_info_temp[2] = submatrix_tolerence[xdex][ydex]
+																					
+											
+											for suborder_loc in range(3,3+ncell):
+												submatrix_info_temp[suborder_loc] = submatrix_refined[lev-1][xdex][ydex][suborder_loc-3]
+											for suborder_pair in range(3+ncell,3+ncell+len(submatrix_pair[xdex][ydex])):
+												submatrix_info_temp[suborder_pair] = submatrix_pair[xdex][ydex][suborder_pair-3-ncell]
+											submatrix_info_temp = np.array(submatrix_info_temp)			
+											submatrix_info[lev-1][xdex][ydex] = submatrix_info_temp		
+																																					
+											
+											#submatrix_path_info = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subinfo_%i_%i_%i_%i.txt'%(lev,xdex,ydex,ron)
+											submatrix_path_info = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subinfo_%i_%i_%i_%i.txt'%(lev,xdex,ydex,ron)
+											open('%s'%submatrix_path_info, 'a').close()						
+											with open(submatrix_path_info,'w') as finfo:				
+												for suborder in range(len(submatrix_info_temp)):
+													
+													for suborder_line in range(len(submatrix_info_temp[suborder])):
+														if suborder<2:
+															#for con in range(len(submatrix_info_temp[suborder][suborder_line])):
+																#finfo.write('%i '%submatrix_info_temp[suborder][suborder_line][con])															
+															finfo.writelines('%i '%submatrix_info_temp[suborder][suborder_line])
+															#finfo.writelines('%s\n'%submatrix_info_temp[suborder][suborder_line])
+														elif suborder<(3+len(submatrix_refined[lev-1][xdex][ydex])):
+															finfo.writelines('%.10e '%submatrix_info_temp[suborder][suborder_line])
+														else:
+															finfo.writelines('%i '%submatrix_info_temp[suborder][suborder_line])
+													finfo.write('\n')
+												
+												finfo.write('\n')																																 													
+																	
+														
+											calibrators[lev-1][xdex][ydex] = omni.RedundantCalibrator(ncell)
+											(calibrators[lev-1][xdex][ydex]).compute_redundantinfo(submatrix_path_info)
+											infos[lev-1][xdex][ydex] = calibrators[lev-1][xdex][ydex].Info.get_info()
+											
+											ubl = infos[lev-1][0][0]['ublindex']
+											nubl = infos[lev-1][0][0]['nUBL']
+											count_ubl = infos[lev-1][0][0]['ublcount']
+											order_ubl = np.argsort(count_ubl)[::-1]
+											exbls = np.zeros([len(ubl),len(ubl[0][0])-1])
+											
+											lower = 0
+											upper = nubl
+											
+											for ex in range(lower,upper):
+												exbls[ex] = ubl[order_ubl[ex]][0][0:2]
+												
+											
+											ex_refined = np.array(exbls).reshape(1,len(exbls)*len(exbls[0]))
+											ex_refined = ex_refined.astype(int)
+											
+											#ubl_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+											ubl_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+											np.savetxt('%s'%ubl_path, ex_refined,fmt='%i')
+											with open(ubl_path,'a') as fubl:	
+												fubl.write('\n')
+
+									submatrix_info[lev-1] = np.array(submatrix_info[lev-1])
+									submatrix_loc = submatrix_raw
+
+
+								#elif ncell == nant:
+									
+								elif ron == 0:																									
+																	
+									submatrix_refined[0][0][0] = loc_info_tuple
+									order_standard = [ncell-3, ncell-(cell[0]//2)*cell[1], ncell-(cell[0]-1)*cell[1]-2]
+									
+									calibrators[lev-1][0][0] = omni.RedundantCalibrator(ncell)
+									(calibrators[lev-1][0][0]).compute_redundantinfo(arrayinfopath)
+									infos[lev-1][0][0] = calibrators[lev-1][0][0].Info.get_info()
+									
+									ubl = infos[lev-1][0][0]['ublindex']
+									nubl = infos[lev-1][0][0]['nUBL']
+									count_ubl = infos[lev-1][0][0]['ublcount']
+									order_ubl = np.argsort(count_ubl)[::-1]
+									exbls = np.zeros([len(ubl),len(ubl[0][0])-1])
+									
+									lower = 0
+									upper = nubl
+									
+									for ex in range(lower,upper):
+										exbls[ex] = ubl[order_ubl[ex]][0][0:2]
+										
+									
+									ex_refined = np.array(exbls).reshape(1,len(exbls)*len(exbls[0]))
+									ex_refined = ex_refined.astype(int)
+									
+									#ubl_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+									ubl_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+									np.savetxt('%s'%ubl_path, ex_refined,fmt='%i')
+									with open(ubl_path,'a') as fubl:	
+										fubl.write('\n')												
+											
+								else: #ron != 0:							
+									
+									#submatrix_path_info = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subinfo_%i_%i_%i_%i.txt'%(lev,ronp,ronp,ronp)
+									submatrix_path_info = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subinfo_%i_%i_%i_%i.txt'%(lev,ronp,ronp,ronp)									
+																		
+									submatrix_refined[0][0][0] = loc_info_tuple_sorted
+									
+									calibrators[lev-1][0][0] = omni.RedundantCalibrator(ncell)
+									(calibrators[lev-1][0][0]).compute_redundantinfo(submatrix_path_info)
+									infos[lev-1][0][0] = calibrators[lev-1][0][0].Info.get_info()
+									
+									ubl = infos[lev-1][0][0]['ublindex']
+									nubl = infos[lev-1][0][0]['nUBL']
+									count_ubl = infos[lev-1][0][0]['ublcount']
+									order_ubl = np.argsort(count_ubl)[::-1]
+									exbls = np.zeros([len(ubl),len(ubl[0][0])-1])
+									
+									lower = 0
+									upper = nubl
+									
+									for ex in range(lower,upper):
+										exbls[ex] = ubl[order_ubl[ex]][0][0:2]
+										
+									
+									ex_refined = np.array(exbls).reshape(1,len(exbls)*len(exbls[0]))
+									ex_refined = ex_refined.astype(int)
+									
+									#ubl_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+									ubl_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial, ron)
+									np.savetxt('%s'%ubl_path, ex_refined,fmt='%i')
+									with open(ubl_path,'a') as fubl:	
+										fubl.write('\n')																																	
+										
+																	
+								
+							
+					if magnitude_noise == 0:
+						if trial == 0: 
+							submatrix_data_pure[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+							submatrix_data[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
+							
+							if ncell != nant (whole == 1 and ron == 0):
+																									
+								for xdex in range(cell[0]**(lev-1)):
+									for ydex in range(cell[1]**(lev-1)):
+										
+										#submatrix_data_pure=[None]*levels
+										#submatrix_data=[None]*levels
+																	
+										#submatrix_data_pure[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										#submatrix_data[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										
+										submatrix_data_temp = []									
+										
+										for p2 in range(ncell):
+											origin_order2 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p2]))      
+											
+											for p1 in range(ncell):
+												
+												origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))									
+												
+												if [origin_order1, origin_order2] in pair_info:
+											 		origin_order_pair = pair_info.index([origin_order1,origin_order2])								
+												 	submatrix_data_temp.append(data_pure[origin_order_pair])
+										
+										submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_temp)										
+										#submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_pure[lev-1][xdex][ydex]).reshape(len(submatrix_data_pure[lev-1][xdex][ydex]),1)
+										
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex], fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')
+											
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, np.array(submatrix_data_temp), fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')
+							
+							# ncell == nant				
+							elif ron == 0:
+								submatrix_data_pure[lev-1][0][0] = data_pure
+							
+							# ron != 0	
+							else: 
+								for xdex in range(cell[0]**(lev-1)):
+									for ydex in range(cell[1]**(lev-1)):
+										
+										#submatrix_data_pure=[None]*levels
+										#submatrix_data=[None]*levels
+																	
+										#submatrix_data_pure[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										#submatrix_data[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										
+										submatrix_data_temp = []									
+										
+										for p2 in range(ncell):
+											origin_order2 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p2]))      
+											
+											for p1 in range(ncell):
+												
+												origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))									
+												
+												if [origin_order1, origin_order2] in pair_info:
+											 		origin_order_pair = pair_info.index([origin_order1,origin_order2])								
+												 	submatrix_data_temp.append(data_pure[origin_order_pair])
+										
+										submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_temp)										
+										#submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_pure[lev-1][xdex][ydex]).reshape(len(submatrix_data_pure[lev-1][xdex][ydex]),1)
+										
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex], fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')
+											
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, np.array(submatrix_data_temp), fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')								
+								
+																	
+					
+					##Already Changed!						
+					#if magnitude_noise == 0:
+						#if trial == 0:																	
+							#for xdex in range(cell[0]**(lev-1)):
+								#for ydex in range(cell[1]**(lev-1)):												
+									##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+									#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+									#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex])
+									#with open(submatrix_path_data,'a') as fdata:	
+										#fdata.write('\n')
+										
+									#with open(submatrix_path_data) as f:
+										#sub_rawdata = [[float(x) for x in line.split()] for line in f]
+									#submatrix_data_pure[lev-1][xdex][ydex] = np.array([i[0] + 1.0j*i[1] for i in sub_rawdata[:-1]],dtype = 'complex64')    #last element of rawinfo is empty																			
+					
+																					
+					noise = (np.random.normal(scale = deviation[magnitude_noise], size = np.array(submatrix_data_pure[lev-1]).shape) + 1.0j*np.random.normal(scale = deviation[magnitude_noise], size = np.array(submatrix_data_pure[lev-1]).shape)).astype('complex64')
+					
+					#Already Changed!
+					#for xdex in range(cell[0]**(lev-1)):
+						#for ydex in range(cell[1]**(lev-1)):												
+							##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+							#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+							#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex])
+							#with open(submatrix_path_data,'a') as fdata:	
+								#fdata.write('\n')					
+					
+					submatrix_data[lev-1] = submatrix_data_pure[lev-1] + noise*general_scale
+					
+					#for xdex in range(cell[0]**(lev-1)):
+						#for ydex in range(cell[1]**(lev-1)):
+							#noise = (np.random.normal(scale = deviation[magnitude_noise], size = np.array(submatrix_data_pure[lev-1][xdex][ydex]).shape) + 1.0j*np.random.normal(scale = deviation[magnitude_noise], size = np.array(submatrix_data_pure[lev-1][xdex][ydex]).shape)).astype('complex64')
+							#submatrix_data[lev-1][xdex][ydex] = submatrix_data_pure[lev-1][xdex][ydex] + noise*general_scale												
+							##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+							#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+							#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex])
+							#with open(submatrix_path_data,'a') as fdata:	
+								#fdata.write('\n')							
+							
+	
+					for xdex in range(cell[0]**(lev-1)):
+						for ydex in range(cell[1]**(lev-1)):																			
+													
+							calibrator = calibrators[lev-1][xdex][ydex]
+							info = infos[lev-1][xdex][ydex]
+							
+							removedegen = True
+							removeadditive = False
+							needrawcal = True 
+							keep_binary_data = True
+							keep_binary_calpar = True
+							converge_percent = 0.00001
+							#max_iter = 50
+							#max_iter = 1
+							step_size = .2
+							
+							submatrix_data_reshaped = (submatrix_data[lev-1][xdex][ydex]).reshape((1,1,len(submatrix_data[lev-1][xdex][ydex])))
+							
+							
+							#Already Changed!
+							##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev,xdex,ydex)
+							#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev, xdex, ydex)
+							#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex])
+							#with open(submatrix_path_data,'a') as fdata:	
+								#fdata.write('\n')
+
+							##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev,xdex,ydex)
+							#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev, xdex, ydex)
+							#np.savetxt('%s'%submatrix_path_data, submatrix_data_reshaped[0][0])
+							#with open(submatrix_path_data,'a') as fdata:	
+								#fdata.write('\n')								
+															
+							
+							calibrator.removeDegeneracy = removedegen
+							calibrator.removeAdditive = removeadditive
+							calibrator.keepData = keep_binary_data
+							calibrator.keepCalpar = keep_binary_calpar
+							calibrator.convergePercent = converge_percent
+							calibrator.maxIteration = max_iter
+							calibrator.stepSize = step_size
+							calibrator.computeUBLFit = True
+							
+							
+							tm = omni.Timer()
+							calibrator.logcal(submatrix_data_reshaped, np.zeros_like(submatrix_data_reshaped), verbose=True)
+							tm.tick()
+							calibrator.lincal(submatrix_data_reshaped, np.zeros_like(submatrix_data_reshaped), verbose=True)
+							tm.tick()
+							lin = np.copy(calibrator.rawCalpar)
+							ampcal = lin[0,0,3:info['nAntenna']+3]
+							phasecal = lin[0,0,info['nAntenna']+3: info['nAntenna']*2+3]
+							calpar = 10**(ampcal)*np.exp(1.0j*phasecal)
+							ublfit = lin[0,0,3+2*info['nAntenna']::2]+1.0j*lin[0,0,3+2*info['nAntenna']+1::2]
+							
+									
+							submatrix_calpar_Refined[lev-1][xdex][ydex][info['subsetant']] = calpar
+							submatrix_calpar_amplitude[lev-1][xdex][ydex][info['subsetant']] = ampcal
+							submatrix_calpar_phase[lev-1][xdex][ydex][info['subsetant']] = phasecal
+							
+							DOF[LEV] = DOF[LEV] + info['A'].shape[0] - info['A'].shape[1]
+							
+							
+							#Already Changed!
+							##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev,xdex,ydex)
+							#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev, xdex, ydex)
+							#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex])
+							#with open(submatrix_path_data,'a') as fdata:	
+								#fdata.write('\n')								
+							
+							#ubl = info['ublindex']
+							#nubl = info['nUBL']
+							#exbls = np.zeros([len(ubl),len(ubl[0][0])])
+							
+							#lower = 0
+							#upper = nubl
+							
+							#for ex in range(lower,upper):
+								#exbls[ex] = ubl[ex][0][0:2]
+								
+							
+							#ex_refined = np.array(exbls).reshape(1,len(exbls)*len(exbls[0]))
+							
+							##ubl_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+							#ubl_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/UBL_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+							#np.savetxt('%s'%ubl_path, ex_refined)
+							#with open(ubl_path,'a') as fubl:	
+								#fubl.write('\n')								
+								
+							
+							if lev > 1:	
+								phase_order = [0, len(calibrator.Info.ubl)//2]
+								nstandards_p = 2
+								
+								standard_calpar = np.zeros(nstandards_p)
+								
+								phase_adjusting = np.array([np.imag(np.log(lin[0][0][3+2*ncell+2*phase_order[adjust_order]] + 1.0j*lin[0][0][3+2*ncell+2*phase_order[adjust_order]+1]))*1.0
+															for adjust_order in range(nstandards_p)]).astype('float64')
+													 
+								coordinate_adjusting = np.array([calibrator.Info.ubl[phase_order[adjust_order]]
+															for adjust_order in range(nstandards_p)]).astype('float64')
+																																									 
+								discrepancy_phase = phase_adjusting - standard_calpar
+								
+								Y_phase = discrepancy_phase
+								A_phase = coordinate_adjusting[:,0:2]				 
+								k_degen_p = np.zeros(3)
+													 					 
+								k_degen_p[:dimension] = np.linalg.solve(A_phase, Y_phase)												
+									
+								
+								phase_shift_p[lev-1][xdex][ydex] = submatrix_refined[lev-1][xdex][ydex].dot(k_degen_p)
+								submatrix_calpar_phase_calibrated_p[lev-1][xdex][ydex] = submatrix_calpar_phase[lev-1][xdex][ydex] + phase_shift_p[lev-1][xdex][ydex]
+								
+														
+								calpar_phasecalibrated = 10**(submatrix_calpar_amplitude[lev-1][xdex][ydex])*np.exp(1.0j*submatrix_calpar_phase_calibrated_p[lev-1][xdex][ydex])
+								submatrix_calpar_Refined_phasecalibrated[lev-1][xdex][ydex] = calpar_phasecalibrated
+								
+								
+								#Already Changed Here!
+								##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev,xdex,ydex)
+								#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i_test.txt'%(index, magnitude_noise, lev, xdex, ydex)
+								#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex])
+								#with open(submatrix_path_data,'a') as fdata:	
+									#fdata.write('\n')								
+								
+							#elif levels == 1:
+								#phase_order = [0, len(calibrator.Info.ubl)//2]
+								#nstandards_p = 2
+								
+								#standard_calpar = np.zeros(nstandards_p)
+								
+								#phase_adjusting = np.array([np.imag(np.log(lin[0][0][3+2*ncell+2*phase_order[adjust_order]] + 1.0j*lin[0][0][3+2*ncell+2*phase_order[adjust_order]+1]))*1.0
+															#for adjust_order in range(nstandards_p)]).astype('float64')
+													 
+								#coordinate_adjusting = np.array([calibrator.Info.ubl[phase_order[adjust_order]]
+															#for adjust_order in range(nstandards_p)]).astype('float64')
+													 
+								#discrepancy_phase = phase_adjusting - standard_calpar
+								
+								#Y_phase = discrepancy_phase
+								#A_phase = coordinate_adjusting[:,0:2]				 
+								#k_degen_p = np.zeros(3)
+													 					 
+								#k_degen_p[:dimension] = np.linalg.solve(A_phase, Y_phase)												
+									
+								
+								#phase_shift_p[lev-1][xdex][ydex] = submatrix_refined[lev-1][xdex][ydex].dot(k_degen_p)
+								#submatrix_calpar_phase_calibrated_p[lev-1][xdex][ydex] = submatrix_calpar_phase[lev-1][xdex][ydex] + phase_shift_p[lev-1][xdex][ydex]
+								
+														
+								#calpar_phasecalibrated = 10**(submatrix_calpar_amplitude[lev-1][xdex][ydex])*np.exp(1.0j*submatrix_calpar_phase_calibrated[lev-1][xdex][ydex])
+								#submatrix_calpar_Refined_phasecalibrated[lev-1][xdex][ydex] = calpar_phasecalibrated																										                       
+				            
+						
+				
+				if magnitude_noise == 0:
+					if trial == 0:
+						
+						#submatrix_path_transcoef = os.path.split(os.path.dirname(os.path.realpath(__file__)))[0] + '/Point_test_Transport_ratio_%i.txt'%index
+						submatrix_path_transcoef = '/home/jianshu/Documents/Research/Calibration' + '/Point_test_Transport_ratio_%i.txt'%index
+						with open(submatrix_path_transcoef) as ftrans:
+							rawtrans = [[float(x) for x in line.split()] for line in ftrans]
+						temp = np.array(rawtrans[:-1])
+						correctcalpar = (np.array(temp[:,0]) + 1.0j*np.array(temp[:,1]))#[info['subsetant']]
+						for i in range(nant):
+							if i in excluded_array:
+								correctcalpar[i] = 0.0
+						
+						
+						
+						standard_origin_order[0] = loc_info_tuple.index(tuple(submatrix_refined[0][0][0][order_standard[0]]))
+						standard_origin_order[1] = loc_info_tuple.index(tuple(submatrix_refined[0][0][0][order_standard[1]]))
+						standard_origin_order[2] = loc_info_tuple.index(tuple(submatrix_refined[0][0][0][order_standard[2]]))
+						
+						
+						
+						standard_calpar_a = np.array([[np.real(np.log10(correctcalpar[standard_origin_order[stand_order]]))*1.0, np.imag(np.log(correctcalpar[standard_origin_order[stand_order]]))*1.0]
+													for stand_order in range(nstandards)]).astype('float64')
+													
+						coordinate_ajusting = np.array([submatrix_refined[0][0][0][order_standard[ajust_order]]
+													for ajust_order in range(nstandards)])
+				
+				calpar_ajusting_a = np.array([[submatrix_calpar_amplitude[0][0][0][order_standard[ajust_order]], submatrix_calpar_phase[0][0][0][order_standard[ajust_order]]]
+											for ajust_order in range(nstandards)]).astype('float64')
+									 
+									 
+				discrepancy_amplitude = standard_calpar_a[:,0]-calpar_ajusting_a[:,0]
+				discrepancy_phase = standard_calpar_a[:,1]-calpar_ajusting_a[:,1]
+				
+				Y_phase = np.array([(discrepancy_phase[solve_order] - discrepancy_phase[solve_order+1]) for solve_order in range(nstandards-1)]).reshape((nstandards-1))
+				A_phase = np.array([[coordinate_ajusting[solve_order,:dimension] - coordinate_ajusting[solve_order+1,:dimension]] for solve_order in range(nstandards-1)]).reshape((nstandards-1,dimension))				 
+				k_degen = np.zeros(3)
+									 					 
+				k_degen[:dimension] = np.linalg.solve(A_phase, Y_phase)				
+				phase_general = discrepancy_phase-coordinate_ajusting.dot(k_degen)
+				
+					
+				
+				phase_shift[0] = submatrix_refined[0][0][0].dot(k_degen) + phase_general[0]
+				submatrix_calpar_phase_calibrated[0][0][0] = submatrix_calpar_phase[0][0][0] + phase_shift[0]
+				
+				amplitude_shift[0] = discrepancy_amplitude[0]
+				submatrix_calpar_amplitude_calibrated[0][0][0] = submatrix_calpar_amplitude[0][0][0] + amplitude_shift[0]
+				
+				calpar_calibrated = 10**(submatrix_calpar_amplitude_calibrated[0][0][0])*np.exp(1.0j*submatrix_calpar_phase[0][0][0])
+				submatrix_calpar_Refined_calibrated[0][0][0] = calpar_calibrated
+				
+				
+				for lev in range(2,levels+1):
+					
+					for xdex in range(cell[0]**(lev-2)):
+						for ydex in range(cell[1]**(lev-2)):
+							submatrix_calpar_amplitude_select[lev-1][xdex][ydex] = 	submatrix_calpar_amplitude[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], ncell-1 ] 	
+							amplitude_shift[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] = submatrix_calpar_amplitude_calibrated[lev-2][xdex][ydex].reshape((cell[0],cell[1])) - submatrix_calpar_amplitude_select[lev-1][xdex][ydex]
+										
+					for xdex in range(cell[0]**(lev-2)):
+						for ydex in range(cell[1]**(lev-2)):
+							submatrix_calpar_phase_select[lev-1][xdex][ydex] = 	submatrix_calpar_phase_calibrated_p[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1], ncell-1 ] 	
+							phase_shift[lev-1][ xdex*cell[0]:(xdex+1)*cell[0], ydex*cell[1]:(ydex+1)*cell[1] ] = submatrix_calpar_phase_calibrated[lev-2][xdex][ydex].reshape((cell[0],cell[1])) - submatrix_calpar_phase_select[lev-1][xdex][ydex]
+					
+					
+					for xdex in range(cell[0]**(lev-1)):
+						for ydex in range(cell[1]**(lev-1)):
+							submatrix_calpar_amplitude_calibrated[lev-1][xdex][ydex] =  submatrix_calpar_amplitude[lev-1][xdex][ydex] + amplitude_shift[lev-1][xdex][ydex]
+							
+					for xdex in range(cell[0]**(lev-1)):
+						for ydex in range(cell[1]**(lev-1)):
+							submatrix_calpar_phase_calibrated[lev-1][xdex][ydex] = submatrix_calpar_phase_calibrated_p[lev-1][xdex][ydex]  + phase_shift[lev-1][xdex][ydex]
+					
+				
+				for xdex in range(cell[0]**(levels-1)):
+					for ydex in range(cell[1]**(levels-1)):
+						for p1 in range(ncell):
+							origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[levels-1][xdex][ydex][p1]))
+							if not (origin_order1 in excluded_array):
+								calpar_calibrated_original[origin_order1] = 10**(submatrix_calpar_amplitude_calibrated[levels-1][xdex][ydex][p1])*np.exp(1.0j*submatrix_calpar_phase_calibrated[levels-1][xdex][ydex][p1])
+							else:
+								calpar_calibrated_original[origin_order1] = 0.0
+				
+				calpar_calibrated_original_mean = calpar_calibrated_original_mean + calpar_calibrated_original
+				
+				if trial % period == 0:
+					
+					#calibrated_path_time = os.path.dirname(os.path.realpath(__file__)) + '/Data/calpar_time_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+					calibrated_path_time = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/calpar_time_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+					np.savetxt('%s'%calibrated_path_time, [trial,trial])
+					with open(calibrated_path_time,'a') as ftime:	
+						ftime.write('\n')	
+
+
+				diff_vector[LEV][index][magnitude_noise] = calpar_calibrated_original - correctcalpar
+				diff_scale[LEV][index][magnitude_noise] = la.norm(diff_vector[LEV][index][magnitude_noise])
+				
+				diff_vector_mean[LEV][index][magnitude_noise] = diff_vector_mean[LEV][index][magnitude_noise] + diff_vector[LEV][index][magnitude_noise]
+				diff_scale_mean[LEV][index][magnitude_noise] = diff_scale_mean[LEV][index][magnitude_noise] + diff_scale[LEV][index][magnitude_noise]
+				
+				
+				if trial == ntimes-1:
+					
+					calpar_calibrated_original_mean = calpar_calibrated_original_mean/ntimes
+					diff_vector_mean[LEV][index][magnitude_noise] = diff_vector_mean[LEV][index][magnitude_noise]/ntimes
+					diff_scale_mean[LEV][index][magnitude_noise] = diff_scale_mean[LEV][index][magnitude_noise]/ntimes
+					
+				
+					#calibrated_path_calpar = os.path.dirname(os.path.realpath(__file__)) + '/Data/calpar_calibrated_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+					calibrated_path_calpar = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/calpar_calibrated_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+					np.savetxt('%s'%calibrated_path_calpar, calpar_calibrated_original_mean)
+					with open(calibrated_path_calpar,'a') as fcalibrated:	
+						fcalibrated.write('\n')		
+											
+					
+					#diff_vector_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/diffvector_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+					diff_vector_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/diffvector_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+					np.savetxt('%s'%diff_vector_path, diff_vector_mean[LEV][index][magnitude_noise])
+					with open(diff_vector_path,'a') as fdiffvec:	
+						fdiffvec.write('\n')
+						
+		#diff_scale_mean_path = os.path.dirname(os.path.realpath(__file__)) + '/Data/diffscale_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+		diff_scale_mean_path = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/diffscale_%i_%i_%i_[%i, %i]_[%i, %i]_%i_%i.txt'%(LEV,index,magnitude_noise,main_array[0],main_array[1],cell[0],cell[1],DOF[LEV], trial)
+		np.savetxt('%s'%diff_scale_mean_path, diff_scale_mean[LEV][index])
+		with open(diff_scale_mean_path,'a') as fdiffscal_mean:	
+			fdiffscal_mean.write('\n')
+
+
+
+
+
