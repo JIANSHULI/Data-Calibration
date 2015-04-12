@@ -34,13 +34,13 @@ mini_cell = [[3,3],[9,9],[81,81]]
 #mini_cell = [[3,3]]
 
 nfile = 1
-range_noise = 1
-ntimes = 11
-period = 5
+range_noise = 7
+ntimes = 51
+period = 10
 general_scale = 1.0
 
 
-min_noise = -30.0
+min_noise = -35.0
 step_noise = 5
 deviation = np.zeros(range_noise) 
 deviation = [10**((min_noise+magnitude_noise*step_noise)/10.0) for magnitude_noise in range(range_noise)]
@@ -516,45 +516,93 @@ for LEV in range(hier_ways):
 							submatrix_data_pure[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
 							submatrix_data[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
 							
+							if ncell != nant:
+																									
+								for xdex in range(cell[0]**(lev-1)):
+									for ydex in range(cell[1]**(lev-1)):
+										
+										#submatrix_data_pure=[None]*levels
+										#submatrix_data=[None]*levels
 																	
-						for xdex in range(cell[0]**(lev-1)):
-							for ydex in range(cell[1]**(lev-1)):
-								
-								#submatrix_data_pure=[None]*levels
-								#submatrix_data=[None]*levels
-															
-								#submatrix_data_pure[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
-								#submatrix_data[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
-								
-								submatrix_data_temp = []									
-								
-								for p2 in range(ncell):
-									origin_order2 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p2]))      
-									
-									for p1 in range(ncell):
+										#submatrix_data_pure[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										#submatrix_data[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
 										
-										origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))									
+										submatrix_data_temp = []									
 										
-										if [origin_order1, origin_order2] in pair_info:
-									 		origin_order_pair = pair_info.index([origin_order1,origin_order2])								
-										 	submatrix_data_temp.append(data_pure[origin_order_pair])
+										for p2 in range(ncell):
+											origin_order2 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p2]))      
+											
+											for p1 in range(ncell):
+												
+												origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))									
+												
+												if [origin_order1, origin_order2] in pair_info:
+											 		origin_order_pair = pair_info.index([origin_order1,origin_order2])								
+												 	submatrix_data_temp.append(data_pure[origin_order_pair])
+										
+										submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_temp)										
+										#submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_pure[lev-1][xdex][ydex]).reshape(len(submatrix_data_pure[lev-1][xdex][ydex]),1)
+										
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex], fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')
+											
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, np.array(submatrix_data_temp), fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')
+							
+							# ncell == nant				
+							elif ron == 0:
+								submatrix_data_pure[lev-1][0][0] = data_pure
+							
+							# ron != 0	
+							else: 
+								for xdex in range(cell[0]**(lev-1)):
+									for ydex in range(cell[1]**(lev-1)):
+										
+										#submatrix_data_pure=[None]*levels
+										#submatrix_data=[None]*levels
+																	
+										#submatrix_data_pure[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										#submatrix_data[lev-1] = [[None]*cell[1]**(lev-1)]*cell[0]**(lev-1)
+										
+										submatrix_data_temp = []									
+										
+										for p2 in range(ncell):
+											origin_order2 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p2]))      
+											
+											for p1 in range(ncell):
+												
+												origin_order1 = loc_info_tuple.index(tuple(submatrix_refined[lev-1][xdex][ydex][p1]))									
+												
+												if [origin_order1, origin_order2] in pair_info:
+											 		origin_order_pair = pair_info.index([origin_order1,origin_order2])								
+												 	submatrix_data_temp.append(data_pure[origin_order_pair])
+										
+										submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_temp)										
+										#submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_pure[lev-1][xdex][ydex]).reshape(len(submatrix_data_pure[lev-1][xdex][ydex]),1)
+										
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex], fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')
+											
+										##Not Changed Yet!
+										##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
+										#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
+										#np.savetxt('%s'%submatrix_path_data, np.array(submatrix_data_temp), fmt = '%f')
+										#with open(submatrix_path_data,'a') as fdata:	
+											#fdata.write('\n')								
 								
-								submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_temp)										
-								#submatrix_data_pure[lev-1][xdex][ydex] = np.array(submatrix_data_pure[lev-1][xdex][ydex]).reshape(len(submatrix_data_pure[lev-1][xdex][ydex]),1)
-								
-								##Not Changed Yet!
-								##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
-								#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
-								#np.savetxt('%s'%submatrix_path_data, submatrix_data_pure[lev-1][xdex][ydex], fmt = '%f')
-								#with open(submatrix_path_data,'a') as fdata:	
-									#fdata.write('\n')
-									
-								##Not Changed Yet!
-								##submatrix_path_data = os.path.dirname(os.path.realpath(__file__)) + '/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev,xdex,ydex)
-								#submatrix_path_data = '/home/jianshu/Documents/Research/Calibration' + '/Codes/Data/Subdata_%i_%i_%i_%i_%i.txt'%(index, magnitude_noise, lev, xdex, ydex)
-								#np.savetxt('%s'%submatrix_path_data, np.array(submatrix_data_temp), fmt = '%f')
-								#with open(submatrix_path_data,'a') as fdata:	
-									#fdata.write('\n')										
+																	
 					
 					##Already Changed!						
 					#if magnitude_noise == 0:
