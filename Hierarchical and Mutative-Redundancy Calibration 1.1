@@ -517,7 +517,7 @@ for LEV in range(hier_ways):
 							submatrix_data_pure[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
 							submatrix_data[lev-1] = np.array([[None]*cell[1]**(lev-1)]*cell[0]**(lev-1))
 							
-							if ncell != nant (whole == 1 and ron == 0):
+							if ncell != nant or (whole == 1 and ron == 0):
 																									
 								for xdex in range(cell[0]**(lev-1)):
 									for ydex in range(cell[1]**(lev-1)):
